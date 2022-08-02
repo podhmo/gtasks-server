@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
+	"github.com/podhmo/quickapi"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
@@ -63,39 +64,28 @@ func run(config Config) error {
 	mux := &http.ServeMux{}
 	mux.HandleFunc("/auth/login", auth.Login)
 	mux.HandleFunc("/auth/callback", auth.Callback)
-	mux.Handle("/", auth.WithToken(Handler(auth.OauthConfig)))
+	{
+		h := quickapi.Lift(ListTokenList(auth.OauthConfig))
+		mux.Handle("/", auth.WithOauthToken(h))
+	}
+
 	u.Path = ""
 	log.Println("listening ...", u.String())
 	return http.ListenAndServe(fmt.Sprintf(":%s", u.Port()), mux)
 }
 
-func Handler(conf *oauth2.Config) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
-
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-
+func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, *tasks.TaskLists] {
+	return func(ctx context.Context, input quickapi.Empty) (*tasks.TaskLists, error) {
 		tok := auth.GetToken(ctx)
 		client := conf.Client(ctx, tok)
 		s, err := tasks.New(client)
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			enc.Encode(map[string]interface{}{
-				"error": fmt.Sprintf("unexpected error: %+v", err),
-				"token": tok,
-			})
-			return
+			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 		}
 		res, err := s.Tasklists.List().Do()
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			enc.Encode(map[string]interface{}{
-				"error": fmt.Sprintf("unexpected error: %+v", err),
-				"token": tok,
-			})
-			return
+			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 		}
-		enc.Encode(res)
-	})
+		return res, nil
+	}
 }
