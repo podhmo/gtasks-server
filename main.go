@@ -76,7 +76,11 @@ func run(config Config) error {
 
 func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
 	return func(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
-		tok := auth.GetToken(ctx)
+		tok, apiErr := auth.GetToken(ctx)
+		if apiErr != nil {
+			return nil, apiErr
+		}
+
 		client := conf.Client(ctx, tok)
 		s, err := tasks.New(client)
 		if err != nil {
@@ -84,7 +88,7 @@ func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks
 		}
 		res, err := s.Tasklists.List().Do()
 		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
+			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
 		}
 		return res.Items, nil
 	}

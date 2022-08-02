@@ -2,9 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
 	"sync"
 
+	"github.com/podhmo/quickapi"
+	"github.com/podhmo/quickapi/shared"
 	"golang.org/x/oauth2"
 )
 
@@ -14,12 +18,15 @@ const (
 	tokenKey ctxkey = "token key"
 )
 
-func GetToken(ctx context.Context) *oauth2.Token {
+func GetToken(ctx context.Context) (*oauth2.Token, interface {
+	error
+	shared.StatusCoder
+}) {
 	v := ctx.Value(tokenKey)
 	if v == nil {
-		return nil
+		return nil, quickapi.NewAPIError(fmt.Errorf("oauth token is not found"), http.StatusUnauthorized)
 	}
-	return v.(*oauth2.Token)
+	return v.(*oauth2.Token), nil
 }
 
 type TokenStore interface {
