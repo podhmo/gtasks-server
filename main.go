@@ -74,8 +74,8 @@ func run(config Config) error {
 	return http.ListenAndServe(fmt.Sprintf(":%s", u.Port()), mux)
 }
 
-func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, *tasks.TaskLists] {
-	return func(ctx context.Context, input quickapi.Empty) (*tasks.TaskLists, error) {
+func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
+	return func(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
 		tok := auth.GetToken(ctx)
 		client := conf.Client(ctx, tok)
 		s, err := tasks.New(client)
@@ -86,6 +86,6 @@ func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, *tasks.T
 		if err != nil {
 			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 		}
-		return res, nil
+		return res.Items, nil
 	}
 }
