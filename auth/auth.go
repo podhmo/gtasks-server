@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"sync"
 
 	"golang.org/x/oauth2"
 )
@@ -77,7 +75,7 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusFound)
 }
 
-func (h *Auth) WithToken(handler http.Handler) http.Handler {
+func (h *Auth) WithOauthToken(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		apikey := h.State
 		tok, ok := h.Store.GetToken(apikey) // TODO: get from request
@@ -88,49 +86,6 @@ func (h *Auth) WithToken(handler http.Handler) http.Handler {
 		req = req.WithContext(context.WithValue(req.Context(), tokenKey, tok))
 		handler.ServeHTTP(w, req)
 	})
-}
-
-// ----------------------------------------
-
-type ctxkey string
-
-const (
-	tokenKey ctxkey = "token key"
-)
-
-func GetToken(ctx context.Context) *oauth2.Token {
-	return ctx.Value(tokenKey).(*oauth2.Token)
-}
-
-type TokenStore interface {
-	GetToken(key string) (*oauth2.Token, bool)
-	SetToken(key string, token *oauth2.Token)
-}
-
-type APIKeyStore struct {
-	mu       sync.Mutex
-	TokenMap map[string]*oauth2.Token // apikey -> token
-}
-
-func NewAPIKeyStore() *APIKeyStore {
-	return &APIKeyStore{TokenMap: map[string]*oauth2.Token{}}
-}
-func (s *APIKeyStore) GetToken(key string) (*oauth2.Token, bool) {
-	if DEBUG {
-		log.Printf("get token: %q", key)
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	v, ok := s.TokenMap[key]
-	return v, ok
-}
-func (s *APIKeyStore) SetToken(key string, token *oauth2.Token) {
-	if DEBUG {
-		log.Printf("set token: %q", key)
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.TokenMap[key] = token
 }
 
 var DEBUG bool
