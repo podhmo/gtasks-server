@@ -15,7 +15,11 @@ const (
 )
 
 func GetToken(ctx context.Context) *oauth2.Token {
-	return ctx.Value(tokenKey).(*oauth2.Token)
+	v := ctx.Value(tokenKey)
+	if v == nil {
+		return nil
+	}
+	return v.(*oauth2.Token)
 }
 
 type TokenStore interface {
