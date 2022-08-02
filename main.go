@@ -9,6 +9,7 @@ import (
 
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
+	"github.com/podhmo/gtasks-server/service"
 	"github.com/podhmo/quickapi"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -76,19 +77,14 @@ func run(config Config) error {
 
 func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
 	return func(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
-		tok, apiErr := auth.GetToken(ctx)
-		if apiErr != nil {
-			return nil, apiErr
+		srv, err := service.New(ctx, conf, tasks.New)
+		if err != nil {
+			return nil, err
 		}
 
-		client := conf.Client(ctx, tok)
-		s, err := tasks.New(client)
+		res, err := service.OrAPIError(srv.Tasklists.List().Do())
 		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
-		}
-		res, err := s.Tasklists.List().Do()
-		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
+			return nil, err
 		}
 		return res.Items, nil
 	}
