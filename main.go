@@ -53,11 +53,12 @@ func run(config Config) error {
 		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
 	}
 
-	state := "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	apikey := config.APIKey // todo: multiple
 	auth := &auth.Auth{
 		OauthConfig: conf,
-		State:       state,
-		Store:       auth.NewAPIKeyStore(),
+		State:       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+		Store:       auth.NewInmemoryStore(),
+		KeyGen:      &auth.ConstantKeyGenerator{Key: apikey},
 		DefaultURL:  "http://localhost:8888/",
 	}
 
@@ -66,7 +67,7 @@ func run(config Config) error {
 	mux.HandleFunc("/auth/callback", auth.Callback)
 	{
 		h := quickapi.Lift(ListTokenList(auth.OauthConfig))
-		mux.Handle("/", auth.WithOauthToken(h))
+		mux.Handle("/", auth.WithOauthToken(h, apikey))
 	}
 
 	u.Path = ""

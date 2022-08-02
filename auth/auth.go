@@ -11,23 +11,30 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type TokenStore interface {
+	GetToken(key string) (*oauth2.Token, bool)
+	SetToken(key string, token *oauth2.Token)
+}
+
+type KeyGenerator interface {
+	GenerateKey(req *http.Request, token *oauth2.Token) string
+}
+
 type Auth struct {
 	OauthConfig *oauth2.Config
 	State       string
 
 	Store      TokenStore
+	KeyGen     KeyGenerator
 	DefaultURL string
 }
 
-func (h *Auth) GetState(req *http.Request) string {
-	return h.State // TODO: get state from request
-}
 func (h *Auth) RedirectURL() string {
 	return h.OauthConfig.RedirectURL
 }
 func (h *Auth) Login(w http.ResponseWriter, req *http.Request) {
 	conf := h.OauthConfig
-	state := h.GetState(req)
+	state := h.State
 
 	// Redirect user to Google's consent page to ask for permission
 	// for the scopes specified above.
@@ -39,7 +46,7 @@ func (h *Auth) Login(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
-	state := h.GetState(req) // TODO: get state from store
+	state := h.State
 	conf := h.OauthConfig
 
 	enc := json.NewEncoder(w)
@@ -70,14 +77,15 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h.Store.SetToken(q.Get("state"), tok)
+	apikey := h.KeyGen.GenerateKey(req, tok)
+	h.Store.SetToken(apikey, tok)
+
 	w.Header().Set("Location", h.DefaultURL)
 	w.WriteHeader(http.StatusFound)
 }
 
-func (h *Auth) WithOauthToken(handler http.Handler) http.Handler {
+func (h *Auth) WithOauthToken(handler http.Handler, apikey string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		apikey := h.State
 		tok, ok := h.Store.GetToken(apikey) // TODO: get from request
 		if !ok {
 			h.Login(w, req)
