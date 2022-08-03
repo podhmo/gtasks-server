@@ -19,7 +19,6 @@ type Config struct {
 	ClientID     string `flag:"client-id"`
 	ClientSecret string `flag:"client-secret"`
 	RedirectURL  string `flag:"redirect-url"`
-	APIKey       string `flag:"api-key"`
 }
 
 func main() {
@@ -53,12 +52,11 @@ func run(config Config) error {
 		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
 	}
 
-	apikey := config.APIKey // todo: multiple
 	auth := &auth.Auth{
 		OauthConfig: conf,
-		State:       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+		Salt:        ":me:",
 		Store:       auth.NewInmemoryStore(),
-		KeyGen:      &auth.ConstantKeyGenerator{Key: apikey},
+		KeyGen:      &auth.UUIDKeyGenerator{},
 		DefaultURL:  "http://localhost:8888/",
 	}
 
@@ -67,7 +65,7 @@ func run(config Config) error {
 	mux.HandleFunc("/auth/callback", auth.Callback)
 	{
 		h := quickapi.Lift(ListTokenList(auth.OauthConfig))
-		mux.Handle("/", auth.WithOauthToken(h, apikey))
+		mux.Handle("/", auth.WithOauthToken(h, ":default-key:"))
 	}
 
 	u.Path = ""

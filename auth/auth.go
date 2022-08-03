@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -17,12 +18,12 @@ type TokenStore interface {
 }
 
 type KeyGenerator interface {
-	GenerateKey(req *http.Request, token *oauth2.Token) string
+	GenerateKey(req *http.Request, token *oauth2.Token, salt string) (string, error)
 }
 
 type Auth struct {
 	OauthConfig *oauth2.Config
-	State       string
+	Salt        string
 
 	Store      TokenStore
 	KeyGen     KeyGenerator
@@ -34,11 +35,10 @@ func (h *Auth) RedirectURL() string {
 }
 func (h *Auth) Login(w http.ResponseWriter, req *http.Request) {
 	conf := h.OauthConfig
-	state := h.State
 
 	// Redirect user to Google's consent page to ask for permission
 	// for the scopes specified above.
-	authURL := conf.AuthCodeURL(state)
+	authURL := conf.AuthCodeURL(h.Salt)
 	fmt.Printf("Visit the URL for the auth dialog: %v\n", authURL)
 
 	w.Header().Set("Location", authURL)
@@ -46,14 +46,13 @@ func (h *Auth) Login(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
-	state := h.State
 	conf := h.OauthConfig
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 
 	q := req.URL.Query()
-	if state != q.Get("state") {
+	if h.Salt != q.Get("state") {
 		w.WriteHeader(http.StatusUnauthorized)
 		enc.Encode(map[string]interface{}{
 			"error":  "invalid state",
@@ -77,15 +76,33 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	apikey := h.KeyGen.GenerateKey(req, tok)
+	apikey, err := h.KeyGen.GenerateKey(req, tok, h.Salt)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		enc.Encode(map[string]interface{}{
+			"error": fmt.Sprintf("something wrong in generate key: %+v", err),
+			"scope": q.Get("scope"),
+			"query": req.URL.Query(),
+			"token": tok,
+		})
+		return
+	}
+
 	h.Store.SetToken(apikey, tok)
 
-	w.Header().Set("Location", h.DefaultURL)
+	qs := url.Values{}
+	qs.Add("apikey", apikey)
+	w.Header().Set("Location", h.DefaultURL+"?"+qs.Encode())
 	w.WriteHeader(http.StatusFound)
 }
 
-func (h *Auth) WithOauthToken(handler http.Handler, apikey string) http.Handler {
+func (h *Auth) WithOauthToken(handler http.Handler, defaultKey string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		apikey := req.URL.Query().Get("apikey")
+		if apikey == "" {
+			apikey = defaultKey
+		}
+
 		tok, ok := h.Store.GetToken(apikey) // TODO: get from request
 		if !ok {
 			h.Login(w, req)
