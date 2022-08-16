@@ -64,7 +64,7 @@ func run(config Config) error {
 	mux.HandleFunc("/auth/login", auth.Login)
 	mux.HandleFunc("/auth/callback", auth.Callback)
 	{
-		h := quickapi.Lift(ListTokenList(auth.OauthConfig))
+		h := quickapi.Lift(ListTaskList(auth.OauthConfig))
 		mux.Handle("/", auth.WithOauthToken(h, ":default-key:"))
 	}
 
@@ -73,7 +73,7 @@ func run(config Config) error {
 	return http.ListenAndServe(fmt.Sprintf(":%s", u.Port()), mux)
 }
 
-func ListTokenList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
+func ListTaskList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
 	return func(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
 		tok, apiErr := auth.GetToken(ctx)
 		if apiErr != nil {
