@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/podhmo/flagstruct"
@@ -21,6 +22,8 @@ type Config struct {
 	ClientID     string `flag:"client-id"`
 	ClientSecret string `flag:"client-secret"`
 	RedirectURL  string `flag:"redirect-url"`
+
+	GenDoc bool `flag:"gendoc"`
 }
 
 func main() {
@@ -59,12 +62,23 @@ func run(config Config) error {
 	router.Get("/auth/login", auth.Login)
 	router.Get("/auth/callback", auth.Callback)
 
-	bc, err := define.NewBuildContext(define.Doc(), router)
+	bc, err := define.NewBuildContext(define.Doc().Server(auth.DefaultURL, "local development"), router)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
 	}
 
-	define.Get(bc, "/", ListTaskList(auth.OauthConfig)) // auth.WithOauthToken(h, ":default-key:"))
+	{
+		define.Get(bc, "/", ListTaskList(auth.OauthConfig)).OperationID("ListTaskList") // auth.WithOauthToken(h, ":default-key:"))
+	}
+
+	if config.GenDoc {
+		return bc.EmitDoc(ctx, os.Stdout)
+	}
+
+	h, err := bc.BuildHandler(ctx)
+	if err != nil {
+		return fmt.Errorf("build handler: %w", err)
+	}
 
 	u, err := url.Parse(config.RedirectURL)
 	if err != nil {
@@ -72,11 +86,6 @@ func run(config Config) error {
 	}
 	u.Path = ""
 	log.Println("listening ...", u.String())
-	h, err := bc.BuildHandler(ctx)
-	if err != nil {
-		return fmt.Errorf("build handler: %w", err)
-	}
-
 	srv := quickapi.NewServer(fmt.Sprintf(":%s", u.Port()), h, 5*time.Second)
 	return srv.ListenAndServe(ctx)
 }
