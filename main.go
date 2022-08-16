@@ -23,7 +23,7 @@ type Config struct {
 	ClientSecret string `flag:"client-secret"`
 	RedirectURL  string `flag:"redirect-url"`
 
-	GenDoc bool `flag:"gendoc"`
+	GenDoc bool `flag:"gendoc" help:"generate openapi.json to stdout"`
 }
 
 func main() {
@@ -68,7 +68,9 @@ func run(config Config) error {
 	}
 
 	{
-		define.Get(bc, "/", ListTaskList(auth.OauthConfig)).OperationID("ListTaskList") // auth.WithOauthToken(h, ":default-key:"))
+		define.Get(bc, "/", ListTaskList(auth.OauthConfig),
+			auth.WithOauthToken(":default-key:"),
+		).OperationID("ListTaskList")
 	}
 
 	if config.GenDoc {

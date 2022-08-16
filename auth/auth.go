@@ -96,21 +96,23 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusFound)
 }
 
-func (h *Auth) WithOauthToken(handler http.Handler, defaultKey string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		apikey := req.URL.Query().Get("apikey")
-		if apikey == "" {
-			apikey = defaultKey
-		}
+func (h *Auth) WithOauthToken(defaultKey string) func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			apikey := req.URL.Query().Get("apikey")
+			if apikey == "" {
+				apikey = defaultKey
+			}
 
-		tok, ok := h.Store.GetToken(apikey) // TODO: get from request
-		if !ok {
-			h.Login(w, req)
-			return
-		}
-		req = req.WithContext(context.WithValue(req.Context(), tokenKey, tok))
-		handler.ServeHTTP(w, req)
-	})
+			tok, ok := h.Store.GetToken(apikey) // TODO: get from request
+			if !ok {
+				h.Login(w, req)
+				return
+			}
+			req = req.WithContext(context.WithValue(req.Context(), tokenKey, tok))
+			handler.ServeHTTP(w, req)
+		})
+	}
 }
 
 var DEBUG bool
