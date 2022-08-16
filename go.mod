@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/podhmo/flagstruct v0.2.0
+	github.com/podhmo/flagstruct v0.5.0
 	github.com/podhmo/quickapi v0.0.0-20220720175550-0b7945ed5305
 	golang.org/x/oauth2 v0.0.0-20220722155238-128564f6959c
 	google.golang.org/api v0.84.0

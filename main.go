@@ -23,10 +23,7 @@ type Config struct {
 
 func main() {
 	config := Config{RedirectURL: "http://localhost:8888"}
-	if err := flagstruct.Parse(&config); err != nil {
-		log.Printf("! %+v", err)
-		return
-	}
+	flagstruct.Parse(&config)
 	if err := run(config); err != nil {
 		log.Printf("!! %+v", err)
 	}
