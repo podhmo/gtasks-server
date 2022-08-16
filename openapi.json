@@ -24,6 +24,75 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "Task": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "due": {
+            "type": "string"
+          },
+          "etag": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TaskLinks"
+            },
+            "type": "array"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string"
+          },
+          "selfLink": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskLinks": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TaskList": {
         "additionalProperties": false,
         "properties": {
@@ -57,7 +126,7 @@
   },
   "openapi": "3.0.3",
   "paths": {
-    "/": {
+    "/api/tasklist": {
       "get": {
         "operationId": "ListTaskList",
         "responses": {
@@ -67,6 +136,46 @@
                 "schema": {
                   "items": {
                     "$ref": "#/components/schemas/TaskList"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "default error"
+          }
+        }
+      }
+    },
+    "/api/tasklist/{tasklistId}": {
+      "get": {
+        "operationId": "ListTasksOfTaskList",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tasklistId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
                   },
                   "type": "array"
                 }

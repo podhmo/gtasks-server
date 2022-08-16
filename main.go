@@ -54,7 +54,7 @@ func run(config Config) error {
 		Salt:        ":me:",
 		Store:       auth.NewInmemoryStore(),
 		KeyGen:      &auth.UUIDKeyGenerator{},
-		DefaultURL:  "http://localhost:8888/",
+		DefaultURL:  "http://localhost:8888/api/tasklist",
 	}
 
 	ctx := context.Background()
@@ -68,9 +68,17 @@ func run(config Config) error {
 	}
 
 	{
-		define.Get(bc, "/", ListTaskList(auth.OauthConfig),
+		// define.Get(bc, "/", ListTaskList(auth.OauthConfig),
+		// 	auth.WithOauthToken(":default-key:"),
+		// ).OperationID("default")
+
+		define.Get(bc, "/api/tasklist", ListTaskList(auth.OauthConfig),
 			auth.WithOauthToken(":default-key:"),
 		).OperationID("ListTaskList")
+		define.Get(bc, "/api/tasklist/{tasklistId}", ListTasksOfTaskList(auth.OauthConfig),
+			auth.WithOauthToken(":default-key:"),
+		).OperationID("ListTasksOfTaskList")
+
 	}
 
 	if config.GenDoc {
@@ -86,8 +94,6 @@ func run(config Config) error {
 	if err != nil {
 		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
 	}
-	u.Path = ""
-	log.Println("listening ...", u.String())
 	srv := quickapi.NewServer(fmt.Sprintf(":%s", u.Port()), h, 5*time.Second)
 	return srv.ListenAndServe(ctx)
 }
@@ -105,6 +111,30 @@ func ListTaskList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.
 			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 		}
 		res, err := s.Tasklists.List().Do()
+		if err != nil {
+			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
+		}
+		return res.Items, nil
+	}
+}
+
+type ListTasksOfTaskListInput struct {
+	TaskListID string `openapi:"path" path:"tasklistId"`
+}
+
+func ListTasksOfTaskList(conf *oauth2.Config) quickapi.Action[ListTasksOfTaskListInput, []*tasks.Task] {
+	return func(ctx context.Context, input ListTasksOfTaskListInput) ([]*tasks.Task, error) {
+		tok, apiErr := auth.GetToken(ctx)
+		if apiErr != nil {
+			return nil, apiErr
+		}
+
+		client := conf.Client(ctx, tok)
+		s, err := tasks.New(client)
+		if err != nil {
+			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
+		}
+		res, err := s.Tasks.List(input.TaskListID).Do()
 		if err != nil {
 			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
 		}
