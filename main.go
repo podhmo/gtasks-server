@@ -6,10 +6,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
+	"github.com/podhmo/quickapi/experimental/define"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
@@ -44,11 +46,6 @@ func run(config Config) error {
 		Endpoint:     google.Endpoint,
 	}
 
-	u, err := url.Parse(config.RedirectURL)
-	if err != nil {
-		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
-	}
-
 	auth := &auth.Auth{
 		OauthConfig: conf,
 		Salt:        ":me:",
@@ -57,17 +54,31 @@ func run(config Config) error {
 		DefaultURL:  "http://localhost:8888/",
 	}
 
-	mux := &http.ServeMux{}
-	mux.HandleFunc("/auth/login", auth.Login)
-	mux.HandleFunc("/auth/callback", auth.Callback)
-	{
-		h := quickapi.Lift(ListTaskList(auth.OauthConfig))
-		mux.Handle("/", auth.WithOauthToken(h, ":default-key:"))
+	ctx := context.Background()
+	router := quickapi.DefaultRouter()
+	router.Get("/auth/login", auth.Login)
+	router.Get("/auth/callback", auth.Callback)
+
+	bc, err := define.NewBuildContext(define.Doc(), router)
+	if err != nil {
+		return fmt.Errorf("build context: %w", err)
 	}
 
+	define.Get(bc, "/", ListTaskList(auth.OauthConfig)) // auth.WithOauthToken(h, ":default-key:"))
+
+	u, err := url.Parse(config.RedirectURL)
+	if err != nil {
+		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
+	}
 	u.Path = ""
 	log.Println("listening ...", u.String())
-	return http.ListenAndServe(fmt.Sprintf(":%s", u.Port()), mux)
+	h, err := bc.BuildHandler(ctx)
+	if err != nil {
+		return fmt.Errorf("build handler: %w", err)
+	}
+
+	srv := quickapi.NewServer(fmt.Sprintf(":%s", u.Port()), h, 5*time.Second)
+	return srv.ListenAndServe(ctx)
 }
 
 func ListTaskList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
