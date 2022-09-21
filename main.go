@@ -15,6 +15,7 @@ import (
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
 	"github.com/podhmo/quickapi/experimental/define"
+	rohandler "github.com/podhmo/reflect-openapi/handler"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
@@ -66,18 +67,14 @@ func run(config Config) error {
 	router.Get("/auth/login", auth.Login)
 	router.Get("/auth/callback", auth.Callback)
 
-	bc, err := define.NewBuildContext(define.Doc().Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development"), router)
+	doc := define.Doc().Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development").Title("gtask-server")
+	bc, err := define.NewBuildContext(doc, router)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
 	}
 
+	// mount handler
 	{
-		{
-			define.Get(bc, "/", func(context.Context, quickapi.Empty) ([]string, error) {
-				return []string{"/api/tasklist"}, nil
-			})
-		}
-
 		{
 			path := "/api/tasklist"
 			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
@@ -92,6 +89,16 @@ func run(config Config) error {
 				auth.WithOauthToken(":default-key:"),
 			).OperationID("ListTasksOfTaskList")
 		}
+	}
+
+	// mount optional handler (not included in openapi.json)
+	{
+		{
+			path := "/api/tasklist"
+			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
+			router.Get(path, quickapi.Lift(api.List))
+		}
+		bc.Router().Mount("/openapi", rohandler.NewHandler(bc.Doc(), "/openapi"))
 	}
 
 	if config.GenDoc {
