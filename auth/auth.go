@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
@@ -38,7 +39,7 @@ func (h *Auth) Login(w http.ResponseWriter, req *http.Request) {
 
 	// Redirect user to Google's consent page to ask for permission
 	// for the scopes specified above.
-	authURL := conf.AuthCodeURL(h.Salt)
+	authURL := conf.AuthCodeURL(h.Salt + "@" + req.URL.Path)
 	fmt.Printf("Visit the URL for the auth dialog: %v\n", authURL)
 
 	w.Header().Set("Location", authURL)
@@ -52,7 +53,12 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 	enc.SetIndent("", "  ")
 
 	q := req.URL.Query()
-	if h.Salt != q.Get("state") {
+	salt, path, found := strings.Cut(q.Get("state"), "@")
+	if !found {
+		path = h.DefaultURL
+	}
+
+	if h.Salt != salt {
 		w.WriteHeader(http.StatusUnauthorized)
 		enc.Encode(map[string]interface{}{
 			"error":  "invalid state",
@@ -92,7 +98,7 @@ func (h *Auth) Callback(w http.ResponseWriter, req *http.Request) {
 
 	qs := url.Values{}
 	qs.Add("apikey", apikey)
-	w.Header().Set("Location", h.DefaultURL+"?"+qs.Encode())
+	w.Header().Set("Location", path+"?"+qs.Encode())
 	w.WriteHeader(http.StatusFound)
 }
 
