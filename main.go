@@ -72,13 +72,20 @@ func run(config Config) error {
 		// 	auth.WithOauthToken(":default-key:"),
 		// ).OperationID("default")
 
-		define.Get(bc, "/api/tasklist", ListTaskList(auth.OauthConfig),
-			auth.WithOauthToken(":default-key:"),
-		).OperationID("ListTaskList")
-		define.Get(bc, "/api/tasklist/{tasklistId}", ListTasksOfTaskList(auth.OauthConfig),
-			auth.WithOauthToken(":default-key:"),
-		).OperationID("ListTasksOfTaskList")
-
+		{
+			path := "/api/tasklist"
+			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
+			define.Get(bc, path, api.List,
+				auth.WithOauthToken(":default-key:"),
+			).OperationID("ListTaskList")
+		}
+		{
+			path := "/api/tasklist/{tasklistId}"
+			api := &TaskAPI{Oauth2Config: auth.OauthConfig}
+			define.Get(bc, path, api.List,
+				auth.WithOauthToken(":default-key:"),
+			).OperationID("ListTasksOfTaskList")
+		}
 	}
 
 	if config.GenDoc {
@@ -98,46 +105,54 @@ func run(config Config) error {
 	return srv.ListenAndServe(ctx)
 }
 
-func ListTaskList(conf *oauth2.Config) quickapi.Action[quickapi.Empty, []*tasks.TaskList] {
-	return func(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
-		tok, apiErr := auth.GetToken(ctx)
-		if apiErr != nil {
-			return nil, apiErr
-		}
-
-		client := conf.Client(ctx, tok)
-		s, err := tasks.New(client)
-		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
-		}
-		res, err := s.Tasklists.List().Do()
-		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
-		}
-		return res.Items, nil
-	}
+type TaskListAPI struct {
+	Oauth2Config *oauth2.Config
 }
 
-type ListTasksOfTaskListInput struct {
+func (api *TaskListAPI) List(ctx context.Context, input quickapi.Empty) ([]*tasks.TaskList, error) {
+	conf := api.Oauth2Config
+
+	tok, apiErr := auth.GetToken(ctx)
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	client := conf.Client(ctx, tok)
+	s, err := tasks.New(client)
+	if err != nil {
+		return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
+	}
+	res, err := s.Tasklists.List().Do()
+	if err != nil {
+		return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
+	}
+	return res.Items, nil
+}
+
+type TaskAPI struct {
+	Oauth2Config *oauth2.Config
+}
+
+type TaskAPIListInput struct {
 	TaskListID string `openapi:"path" path:"tasklistId"`
 }
 
-func ListTasksOfTaskList(conf *oauth2.Config) quickapi.Action[ListTasksOfTaskListInput, []*tasks.Task] {
-	return func(ctx context.Context, input ListTasksOfTaskListInput) ([]*tasks.Task, error) {
-		tok, apiErr := auth.GetToken(ctx)
-		if apiErr != nil {
-			return nil, apiErr
-		}
+func (api *TaskAPI) List(ctx context.Context, input TaskAPIListInput) ([]*tasks.Task, error) {
+	conf := api.Oauth2Config
 
-		client := conf.Client(ctx, tok)
-		s, err := tasks.New(client)
-		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
-		}
-		res, err := s.Tasks.List(input.TaskListID).Do()
-		if err != nil {
-			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
-		}
-		return res.Items, nil
+	tok, apiErr := auth.GetToken(ctx)
+	if apiErr != nil {
+		return nil, apiErr
 	}
+
+	client := conf.Client(ctx, tok)
+	s, err := tasks.New(client)
+	if err != nil {
+		return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
+	}
+	res, err := s.Tasks.List(input.TaskListID).Do()
+	if err != nil {
+		return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
+	}
+	return res.Items, nil
 }

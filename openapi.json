@@ -200,7 +200,7 @@
   "servers": [
     {
       "description": "local development",
-      "url": "http://localhost:8888/"
+      "url": "http://localhost:8888/api/tasklist"
     }
   ]
 }

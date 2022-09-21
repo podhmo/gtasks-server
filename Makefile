@@ -6,3 +6,6 @@ lint:
 
 run:
 	$(GO) run main.go
+
+doc:
+	$(GO) run main.go --gendoc > openapi.json
