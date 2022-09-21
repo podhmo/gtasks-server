@@ -126,6 +126,36 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "/": {
+      "get": {
+        "operationId": "main.run.func1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "default error"
+          }
+        }
+      }
+    },
     "/api/tasklist": {
       "get": {
         "operationId": "ListTaskList",
@@ -200,7 +230,7 @@
   "servers": [
     {
       "description": "local development",
-      "url": "http://localhost:8888/api/tasklist"
+      "url": "http://localhost:8888"
     }
   ]
 }

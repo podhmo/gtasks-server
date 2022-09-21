@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
@@ -59,18 +61,22 @@ func run(config Config) error {
 
 	ctx := context.Background()
 	router := quickapi.DefaultRouter()
+	router.Use(middleware.StripSlashes)
+
 	router.Get("/auth/login", auth.Login)
 	router.Get("/auth/callback", auth.Callback)
 
-	bc, err := define.NewBuildContext(define.Doc().Server(auth.DefaultURL, "local development"), router)
+	bc, err := define.NewBuildContext(define.Doc().Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development"), router)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
 	}
 
 	{
-		// define.Get(bc, "/", ListTaskList(auth.OauthConfig),
-		// 	auth.WithOauthToken(":default-key:"),
-		// ).OperationID("default")
+		{
+			define.Get(bc, "/", func(context.Context, quickapi.Empty) ([]string, error) {
+				return []string{"/api/tasklist"}, nil
+			})
+		}
 
 		{
 			path := "/api/tasklist"
