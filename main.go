@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/render"
+	"github.com/gomarkdown/markdown"
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
@@ -22,9 +25,9 @@ import (
 )
 
 type Config struct {
-	ClientID     string `flag:"client-id"`
-	ClientSecret string `flag:"client-secret"`
-	RedirectURL  string `flag:"redirect-url"`
+	ClientID     string `flag:"client-id" required:"true"`
+	ClientSecret string `flag:"client-secret" required:"true"`
+	RedirectURL  string `flag:"redirect-url" required:"true"`
 
 	GenDoc bool `flag:"gendoc" help:"generate openapi.json to stdout"`
 }
@@ -83,21 +86,35 @@ func run(config Config) error {
 			).OperationID("ListTaskList")
 		}
 		{
-			path := "/api/tasklist/{tasklistId}"
 			api := &TaskAPI{Oauth2Config: auth.OauthConfig}
-			define.Get(bc, path, api.List,
-				auth.WithOauthToken(":default-key:"),
-			).OperationID("ListTasksOfTaskList")
+			{
+				path := "/api/tasklist/{tasklistId}"
+
+				define.Get(bc, path, api.List,
+					auth.WithOauthToken(":default-key:"),
+				).OperationID("ListTasksOfTaskList")
+			}
+		}
+		{
+			api := &MarkdownAPI{Oauth2Config: auth.OauthConfig}
+			{
+				path := "/"
+				define.GetHTML(bc, path, api.ListTaskList, dumpMarkdown,
+					auth.WithOauthToken(":default-key:"),
+				).OperationID("index")
+			}
+			{
+				path := "/{tasklistId}"
+				define.GetHTML(bc, path, api.DetailTaskList, dumpMarkdown,
+					auth.WithOauthToken(":default-key:"),
+				).OperationID("detail")
+			}
+
 		}
 	}
 
 	// mount optional handler (not included in openapi.json)
 	{
-		{
-			path := "/api/tasklist"
-			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
-			router.Get(path, quickapi.Lift(api.List))
-		}
 		bc.Router().Mount("/openapi", rohandler.NewHandler(bc.Doc(), "/openapi"))
 	}
 
@@ -168,4 +185,143 @@ func (api *TaskAPI) List(ctx context.Context, input TaskAPIListInput) ([]*tasks.
 		return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
 	}
 	return res.Items, nil
+}
+
+type MarkdownAPI struct {
+	Oauth2Config *oauth2.Config
+}
+
+func (api *MarkdownAPI) ListTaskList(ctx context.Context, input quickapi.Empty) (string, error) {
+	conf := api.Oauth2Config
+
+	tok, apiErr := auth.GetToken(ctx)
+	if apiErr != nil {
+		return "", apiErr
+	}
+
+	client := conf.Client(ctx, tok)
+	s, err := tasks.New(client)
+	if err != nil {
+		return "", quickapi.NewAPIError(err, http.StatusUnauthorized)
+	}
+	res, err := s.Tasklists.List().Do()
+	if err != nil {
+		return "", quickapi.NewAPIError(err, http.StatusInternalServerError)
+	}
+
+	buf := new(strings.Builder)
+	qs := quickapi.GetRequest(ctx).URL.RawQuery
+
+	fmt.Fprintln(buf, "## api")
+	fmt.Fprintln(buf, "- [doc](/openapi/doc) [redoc](/openapi/redoc)")
+	fmt.Fprintf(buf, "- [list](/api/tasklist?%s) proxy of https://developers.google.com/tasks\n", qs)
+
+	fmt.Fprintln(buf, "## list")
+	fmt.Fprintln(buf, "")
+	tasks := res.Items
+	sort.SliceStable(tasks, func(i, j int) bool { return tasks[i].Updated > tasks[j].Updated })
+	for _, tl := range tasks {
+		fmt.Fprintf(buf, "- [%s](/%s?%s) (updated: %s)\n", tl.Title, tl.Id, qs, tl.Updated)
+	}
+	return buf.String(), nil
+}
+
+type MarkdownAPIDetailTaskListInput struct {
+	TaskListID string `openapi:"path" path:"tasklistId"`
+}
+
+func (api *MarkdownAPI) DetailTaskList(ctx context.Context, input MarkdownAPIDetailTaskListInput) (string, error) {
+	conf := api.Oauth2Config
+
+	tok, apiErr := auth.GetToken(ctx)
+	if apiErr != nil {
+		return "", apiErr
+	}
+
+	client := conf.Client(ctx, tok)
+	s, err := tasks.New(client)
+	if err != nil {
+		return "", quickapi.NewAPIError(err, http.StatusUnauthorized)
+	}
+
+	var tasklist *tasks.TaskList
+	{
+
+		res, err := s.Tasklists.Get(input.TaskListID).Do()
+		if err != nil {
+			return "", quickapi.NewAPIError(err, http.StatusNotFound)
+		}
+		tasklist = res
+	}
+
+	var items []*tasks.Task
+	{
+		res, err := s.Tasks.List(input.TaskListID).Do()
+		if err != nil {
+			return "", quickapi.NewAPIError(err, http.StatusInternalServerError) // xxx
+		}
+		items = res.Items
+	}
+
+	buf := new(strings.Builder)
+	fmt.Fprintf(buf, "# %s", tasklist.Title)
+	fmt.Fprintln(buf, "")
+
+	for _, task := range items {
+		fmt.Fprintf(buf, "- %s\n", task.Title)
+		if task.Notes != "" {
+			fmt.Fprintln(buf, "")
+			fmt.Fprintf(buf, "  - %s\n", task.Notes)
+			fmt.Fprintln(buf, "")
+		}
+	}
+
+	fmt.Fprintln(buf, "")
+	fmt.Fprintln(buf, "----------------------------------------")
+	fmt.Fprintln(buf, "")
+	fmt.Fprintln(buf, "```")
+	for _, task := range items {
+		fmt.Fprintf(buf, "- %s\n", task.Title)
+		if task.Notes != "" {
+			fmt.Fprintln(buf, "")
+			fmt.Fprintf(buf, "  - %s\n", task.Notes)
+			fmt.Fprintln(buf, "")
+		}
+	}
+	fmt.Fprintln(buf, "```")
+	return buf.String(), nil
+}
+
+func dumpMarkdown(ctx context.Context, w http.ResponseWriter, req *http.Request, text string, err error) {
+	template := `<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>-</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.1.0/github-markdown.min.css">
+
+<style>
+	.markdown-body {
+		box-sizing: border-box;
+		min-width: 200px;
+		max-width: 980px;
+		margin: 0 auto;
+		padding: 45px;
+	}
+
+	@media (max-width: 767px) {
+		.markdown-body {
+			padding: 15px;
+		}
+	}
+</style>
+<body>
+<article class="markdown-body">
+%s
+</article>
+</body>
+<html>
+`
+	block := markdown.ToHTML([]byte(text), nil, nil)
+	render.HTML(w, req, fmt.Sprintf(template, block))
 }
