@@ -152,7 +152,7 @@ func (api *TaskListAPI) List(ctx context.Context, input quickapi.Empty) ([]*task
 	if err != nil {
 		return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 	}
-	res, err := s.Tasklists.List().Do()
+	res, err := s.Tasklists.List().MaxResults(100).Do()
 	if err != nil {
 		return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
 	}
@@ -180,11 +180,25 @@ func (api *TaskAPI) List(ctx context.Context, input TaskAPIListInput) ([]*tasks.
 	if err != nil {
 		return nil, quickapi.NewAPIError(err, http.StatusUnauthorized)
 	}
-	res, err := s.Tasks.List(input.TaskListID).Do()
-	if err != nil {
-		return nil, quickapi.NewAPIError(err, http.StatusInternalServerError)
+	var items []*tasks.Task
+	{
+		pageSize := 100 // 20~100
+		res, err := s.Tasks.List(input.TaskListID).MaxResults(int64(pageSize)).Do()
+		if err != nil {
+			return nil, quickapi.NewAPIError(err, http.StatusInternalServerError) // xxx
+		}
+		items = res.Items
+		for res.NextPageToken != "" {
+			pageToken := res.NextPageToken
+			res, err = s.Tasks.List(input.TaskListID).PageToken(pageToken).MaxResults(int64(pageSize)).Do()
+			if err != nil {
+				log.Printf("unexpected error: %+v", err)
+				break
+			}
+			items = append(items, res.Items...)
+		}
 	}
-	return res.Items, nil
+	return items, nil
 }
 
 type MarkdownAPI struct {
@@ -204,7 +218,7 @@ func (api *MarkdownAPI) ListTaskList(ctx context.Context, input quickapi.Empty) 
 	if err != nil {
 		return "", quickapi.NewAPIError(err, http.StatusUnauthorized)
 	}
-	res, err := s.Tasklists.List().Do()
+	res, err := s.Tasklists.List().MaxResults(100).Do()
 	if err != nil {
 		return "", quickapi.NewAPIError(err, http.StatusInternalServerError)
 	}
@@ -256,11 +270,21 @@ func (api *MarkdownAPI) DetailTaskList(ctx context.Context, input MarkdownAPIDet
 
 	var items []*tasks.Task
 	{
-		res, err := s.Tasks.List(input.TaskListID).Do()
+		pageSize := 100 // 20~100
+		res, err := s.Tasks.List(input.TaskListID).MaxResults(int64(pageSize)).Do()
 		if err != nil {
 			return "", quickapi.NewAPIError(err, http.StatusInternalServerError) // xxx
 		}
 		items = res.Items
+		for res.NextPageToken != "" {
+			pageToken := res.NextPageToken
+			res, err = s.Tasks.List(input.TaskListID).PageToken(pageToken).MaxResults(int64(pageSize)).Do()
+			if err != nil {
+				log.Printf("unexpected error: %+v", err)
+				break
+			}
+			items = append(items, res.Items...)
+		}
 	}
 
 	buf := new(strings.Builder)
