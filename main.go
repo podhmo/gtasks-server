@@ -17,8 +17,8 @@ import (
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
-	"github.com/podhmo/quickapi/experimental/define"
-	rohandler "github.com/podhmo/reflect-openapi/handler"
+	"github.com/podhmo/quickapi/qopenapi/define"
+	"github.com/podhmo/reflect-openapi/dochandler"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
@@ -115,7 +115,7 @@ func run(config Config) error {
 
 	// mount optional handler (not included in openapi.json)
 	{
-		bc.Router().Mount("/openapi", rohandler.NewHandler(bc.Doc(), "/openapi"))
+		bc.Router().Mount("/openapi", dochandler.New(bc.Doc(), "/openapi"))
 	}
 
 	if config.GenDoc {
