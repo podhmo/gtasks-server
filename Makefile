@@ -8,4 +8,4 @@ run:
 	$(GO) run .
 
 doc:
-	$(GO) run . --gendoc > openapi.json
+	go generate
