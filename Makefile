@@ -5,7 +5,7 @@ lint:
 	go vet ./...
 
 run:
-	$(GO) run main.go
+	$(GO) run .
 
 doc:
-	$(GO) run main.go --gendoc > openapi.json
+	$(GO) run . --gendoc > openapi.json
