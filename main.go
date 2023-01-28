@@ -83,7 +83,7 @@ func run(config Config) error {
 			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
 			define.Get(bc, path, api.List,
 				auth.WithOauthToken(":default-key:"),
-			).OperationID("ListTaskList")
+			)
 		}
 		{
 			api := &TaskAPI{Oauth2Config: auth.OauthConfig}
@@ -92,7 +92,7 @@ func run(config Config) error {
 
 				define.Get(bc, path, api.List,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("ListTasksOfTaskList")
+				)
 			}
 		}
 		{
@@ -101,13 +101,13 @@ func run(config Config) error {
 				path := "/"
 				define.GetHTML(bc, path, api.ListTaskList, dumpMarkdown,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("index")
+				)
 			}
 			{
 				path := "/{tasklistId}"
 				define.GetHTML(bc, path, api.DetailTaskList, dumpMarkdown,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("detail")
+				)
 			}
 
 		}
@@ -164,7 +164,7 @@ type TaskAPI struct {
 }
 
 type TaskAPIListInput struct {
-	TaskListID string `openapi:"path" path:"tasklistId"`
+	TaskListID string `in:"path" path:"tasklistId"`
 }
 
 func (api *TaskAPI) List(ctx context.Context, input TaskAPIListInput) ([]*tasks.Task, error) {
@@ -241,7 +241,7 @@ func (api *MarkdownAPI) ListTaskList(ctx context.Context, input quickapi.Empty) 
 }
 
 type MarkdownAPIDetailTaskListInput struct {
-	TaskListID string `openapi:"path" path:"tasklistId"`
+	TaskListID string `in:"path" path:"tasklistId"`
 }
 
 func (api *MarkdownAPI) DetailTaskList(ctx context.Context, input MarkdownAPIDetailTaskListInput) (string, error) {
