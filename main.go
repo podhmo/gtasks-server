@@ -52,33 +52,37 @@ var SCOPES = []string{
 }
 
 func run(options Options) error {
-	// Your credentials should be obtained from the Google
-	// Developer Console (https://console.developers.google.com).
-	conf := &oauth2.Config{
-		ClientID:     options.ClientID,
-		ClientSecret: options.ClientSecret,
-		RedirectURL:  options.RedirectURL + "/auth/callback",
-		Scopes:       SCOPES,
-		Endpoint:     google.Endpoint,
-	}
+	var authAPI *auth.Auth
+	{
+		// Your credentials should be obtained from the Google
+		// Developer Console (https://console.developers.google.com).
+		conf := &oauth2.Config{
+			ClientID:     options.ClientID,
+			ClientSecret: options.ClientSecret,
+			RedirectURL:  options.RedirectURL + "/auth/callback",
+			Scopes:       SCOPES,
+			Endpoint:     google.Endpoint,
+		}
 
-	auth := &auth.Auth{
-		OauthConfig: conf,
-		Salt:        ":me:",
-		Store:       auth.NewInmemoryStore(),
-		KeyGen:      &auth.UUIDKeyGenerator{},
-		DefaultURL:  "http://localhost:8888/api/tasklist",
+		authAPI = &auth.Auth{
+			OauthConfig: conf,
+			Salt:        ":me:",
+			Store:       auth.NewInmemoryStore(),
+			KeyGen:      &auth.UUIDKeyGenerator{},
+			DefaultURL:  "http://localhost:8888/api/tasklist",
+		}
+
 	}
 
 	ctx := context.Background()
 	router := quickapi.DefaultRouter()
 	router.Use(middleware.StripSlashes)
 
-	router.Get("/auth/login", auth.Login)
-	router.Get("/auth/callback", auth.Callback)
+	router.Get("/auth/login", authAPI.Login)
+	router.Get("/auth/callback", authAPI.Callback)
 
 	doc := define.Doc().
-		Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development").
+		Server(strings.TrimSuffix(authAPI.DefaultURL, "/api/tasklist"), "local development").
 		Title("gtask-server")
 
 	if !options.GenDoc {
@@ -92,43 +96,9 @@ func run(options Options) error {
 
 	// mount handler
 	{
-		{
-			path := "/api/tasklist"
-			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
-			define.Get(bc, path, api.List,
-				auth.WithOauthToken(":default-key:"),
-			)
-		}
-		{
-			api := &TaskAPI{Oauth2Config: auth.OauthConfig}
-			{
-				path := "/api/tasklist/{tasklistId}"
+		mount(bc, authAPI)
 
-				define.Get(bc, path, api.List,
-					auth.WithOauthToken(":default-key:"),
-				)
-			}
-		}
-		{
-			api := &MarkdownAPI{Oauth2Config: auth.OauthConfig}
-			{
-				path := "/"
-				define.GetHTML(bc, path, api.ListTaskList, dumpMarkdown,
-					auth.WithOauthToken(":default-key:"),
-				)
-			}
-			{
-				path := "/{tasklistId}"
-				define.GetHTML(bc, path, api.DetailTaskList, dumpMarkdown,
-					auth.WithOauthToken(":default-key:"),
-				)
-			}
-
-		}
-	}
-
-	// mount optional handler (not included in openapi.json)
-	{
+		// mount optional handler (not included in openapi.json)
 		bc.Router().Mount("/openapi", dochandler.New(bc.Doc(), "/openapi"))
 	}
 
@@ -159,6 +129,43 @@ func run(options Options) error {
 	}
 	srv := quickapi.NewServer(fmt.Sprintf(":%s", u.Port()), h, 5*time.Second)
 	return srv.ListenAndServe(ctx)
+}
+
+func mount(bc *define.BuildContext, auth *auth.Auth) {
+	{
+		path := "/api/tasklist"
+		api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
+		define.Get(bc, path, api.List,
+			auth.WithOauthToken(":default-key:"),
+		)
+	}
+	{
+		api := &TaskAPI{Oauth2Config: auth.OauthConfig}
+		{
+			path := "/api/tasklist/{tasklistId}"
+
+			define.Get(bc, path, api.List,
+				auth.WithOauthToken(":default-key:"),
+			)
+		}
+	}
+	{
+		api := &MarkdownAPI{Oauth2Config: auth.OauthConfig}
+		{
+			path := "/"
+			define.GetHTML(bc, path, api.ListTaskList, dumpMarkdown,
+				auth.WithOauthToken(":default-key:"),
+			)
+		}
+		{
+			path := "/{tasklistId}"
+			define.GetHTML(bc, path, api.DetailTaskList, dumpMarkdown,
+				auth.WithOauthToken(":default-key:"),
+			)
+		}
+
+	}
+
 }
 
 type TaskListAPI struct {
