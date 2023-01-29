@@ -3,6 +3,7 @@
     "schemas": {
       "ErrorResponse": {
         "additionalProperties": false,
+        "description": "ErrorResponse represents a normal error response type",
         "properties": {
           "code": {
             "type": "integer"
@@ -28,51 +29,66 @@
         "additionalProperties": false,
         "properties": {
           "completed": {
+            "description": "Completed: Completion date of the task (as a RFC 3339 timestamp).\nThis field is omitted if the task has not been completed.",
             "type": "string"
           },
           "deleted": {
+            "description": "Deleted: Flag indicating whether the task has been deleted. The\ndefault is False.",
             "type": "boolean"
           },
           "due": {
+            "description": "Due: Due date of the task (as a RFC 3339 timestamp). Optional. The\ndue date only records date information; the time portion of the\ntimestamp is discarded when setting the due date. It isn't possible\nto read or write the time that a task is due via the API.",
             "type": "string"
           },
           "etag": {
+            "description": "Etag: ETag of the resource.",
             "type": "string"
           },
           "hidden": {
+            "description": "Hidden: Flag indicating whether the task is hidden. This is the case\nif the task had been marked completed when the task list was last\ncleared. The default is False. This field is read-only.",
             "type": "boolean"
           },
           "id": {
+            "description": "Id: Task identifier.",
             "type": "string"
           },
           "kind": {
+            "description": "Kind: Type of the resource. This is always \"tasks#task\".",
             "type": "string"
           },
           "links": {
+            "description": "Links: Collection of links. This collection is read-only.",
             "items": {
               "$ref": "#/components/schemas/TaskLinks"
             },
             "type": "array"
           },
           "notes": {
+            "description": "Notes: Notes describing the task. Optional.",
             "type": "string"
           },
           "parent": {
+            "description": "Parent: Parent task identifier. This field is omitted if it is a\ntop-level task. This field is read-only. Use the \"move\" method to\nmove the task under a different parent or to the top level.",
             "type": "string"
           },
           "position": {
+            "description": "Position: String indicating the position of the task among its\nsibling tasks under the same parent task or at the top level. If this\nstring is greater than another task's corresponding position string\naccording to lexicographical ordering, the task is positioned after\nthe other task under the same parent task (or at the top level). This\nfield is read-only. Use the \"move\" method to move the task to another\nposition.",
             "type": "string"
           },
           "selfLink": {
+            "description": "SelfLink: URL pointing to this task. Used to retrieve, update, or\ndelete this task.",
             "type": "string"
           },
           "status": {
+            "description": "Status: Status of the task. This is either \"needsAction\" or\n\"completed\".",
             "type": "string"
           },
           "title": {
+            "description": "Title: Title of the task.",
             "type": "string"
           },
           "updated": {
+            "description": "Updated: Last modification time of the task (as a RFC 3339\ntimestamp).",
             "type": "string"
           }
         },
@@ -82,12 +98,15 @@
         "additionalProperties": false,
         "properties": {
           "description": {
+            "description": "Description: The description. In HTML speak: Everything between \u003ca\u003e\nand \u003c/a\u003e.",
             "type": "string"
           },
           "link": {
+            "description": "Link: The URL.",
             "type": "string"
           },
           "type": {
+            "description": "Type: Type of the link, e.g. \"email\".",
             "type": "string"
           }
         },
@@ -97,21 +116,27 @@
         "additionalProperties": false,
         "properties": {
           "etag": {
+            "description": "Etag: ETag of the resource.",
             "type": "string"
           },
           "id": {
+            "description": "Id: Task list identifier.",
             "type": "string"
           },
           "kind": {
+            "description": "Kind: Type of the resource. This is always \"tasks#taskList\".",
             "type": "string"
           },
           "selfLink": {
+            "description": "SelfLink: URL pointing to this task list. Used to retrieve, update,\nor delete this task list.",
             "type": "string"
           },
           "title": {
+            "description": "Title: Title of the task list.",
             "type": "string"
           },
           "updated": {
+            "description": "Updated: Last modification time of the task list (as a RFC 3339\ntimestamp).",
             "type": "string"
           }
         },
@@ -128,7 +153,7 @@
   "paths": {
     "/": {
       "get": {
-        "operationId": "index",
+        "operationId": "main.MarkdownAPI.ListTaskList",
         "responses": {
           "200": {
             "content": {
@@ -155,7 +180,7 @@
     },
     "/api/tasklist": {
       "get": {
-        "operationId": "ListTaskList",
+        "operationId": "main.TaskListAPI.List",
         "responses": {
           "200": {
             "content": {
@@ -185,7 +210,7 @@
     },
     "/api/tasklist/{tasklistId}": {
       "get": {
-        "operationId": "ListTasksOfTaskList",
+        "operationId": "main.TaskAPI.List",
         "parameters": [
           {
             "in": "path",
@@ -225,7 +250,7 @@
     },
     "/{tasklistId}": {
       "get": {
-        "operationId": "detail",
+        "operationId": "main.MarkdownAPI.DetailTaskList",
         "parameters": [
           {
             "in": "path",

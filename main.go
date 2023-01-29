@@ -1,8 +1,11 @@
+//go:generate go run ./ --gendoc --docfile openapi.json
 package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,23 +20,27 @@ import (
 	"github.com/podhmo/flagstruct"
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
-	"github.com/podhmo/quickapi/experimental/define"
-	rohandler "github.com/podhmo/reflect-openapi/handler"
+	"github.com/podhmo/quickapi/qopenapi/define"
+	"github.com/podhmo/reflect-openapi/dochandler"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
 )
 
-type Config struct {
+//go:embed openapi.json
+var openapiDocData []byte
+
+type Options struct {
 	ClientID     string `flag:"client-id" required:"true"`
 	ClientSecret string `flag:"client-secret" required:"true"`
 	RedirectURL  string `flag:"redirect-url" required:"true"`
 
-	GenDoc bool `flag:"gendoc" help:"generate openapi.json to stdout"`
+	GenDoc  bool   `flag:"gendoc" help:"generate openapi.json to stdout"`
+	Docfile string `flag:"docfile" help:"write name of openapi.json"`
 }
 
 func main() {
-	config := Config{RedirectURL: "http://localhost:8888"}
+	config := Options{RedirectURL: "http://localhost:8888"}
 	flagstruct.Parse(&config)
 	if err := run(config); err != nil {
 		log.Printf("!! %+v", err)
@@ -44,13 +51,13 @@ var SCOPES = []string{
 	"https://www.googleapis.com/auth/tasks",
 }
 
-func run(config Config) error {
+func run(options Options) error {
 	// Your credentials should be obtained from the Google
 	// Developer Console (https://console.developers.google.com).
 	conf := &oauth2.Config{
-		ClientID:     config.ClientID,
-		ClientSecret: config.ClientSecret,
-		RedirectURL:  config.RedirectURL + "/auth/callback",
+		ClientID:     options.ClientID,
+		ClientSecret: options.ClientSecret,
+		RedirectURL:  options.RedirectURL + "/auth/callback",
 		Scopes:       SCOPES,
 		Endpoint:     google.Endpoint,
 	}
@@ -70,7 +77,14 @@ func run(config Config) error {
 	router.Get("/auth/login", auth.Login)
 	router.Get("/auth/callback", auth.Callback)
 
-	doc := define.Doc().Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development").Title("gtask-server")
+	doc := define.Doc().
+		Server(strings.TrimSuffix(auth.DefaultURL, "/api/tasklist"), "local development").
+		Title("gtask-server")
+
+	if !options.GenDoc {
+		doc = doc.LoadFromData(openapiDocData)
+	}
+
 	bc, err := define.NewBuildContext(doc, router)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
@@ -83,7 +97,7 @@ func run(config Config) error {
 			api := &TaskListAPI{Oauth2Config: auth.OauthConfig}
 			define.Get(bc, path, api.List,
 				auth.WithOauthToken(":default-key:"),
-			).OperationID("ListTaskList")
+			)
 		}
 		{
 			api := &TaskAPI{Oauth2Config: auth.OauthConfig}
@@ -92,7 +106,7 @@ func run(config Config) error {
 
 				define.Get(bc, path, api.List,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("ListTasksOfTaskList")
+				)
 			}
 		}
 		{
@@ -101,13 +115,13 @@ func run(config Config) error {
 				path := "/"
 				define.GetHTML(bc, path, api.ListTaskList, dumpMarkdown,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("index")
+				)
 			}
 			{
 				path := "/{tasklistId}"
 				define.GetHTML(bc, path, api.DetailTaskList, dumpMarkdown,
 					auth.WithOauthToken(":default-key:"),
-				).OperationID("detail")
+				)
 			}
 
 		}
@@ -115,11 +129,23 @@ func run(config Config) error {
 
 	// mount optional handler (not included in openapi.json)
 	{
-		bc.Router().Mount("/openapi", rohandler.NewHandler(bc.Doc(), "/openapi"))
+		bc.Router().Mount("/openapi", dochandler.New(bc.Doc(), "/openapi"))
 	}
 
-	if config.GenDoc {
-		return bc.EmitDoc(ctx, os.Stdout)
+	if options.GenDoc {
+		var w io.Writer = os.Stdout
+		if options.Docfile != "" {
+			f, err := os.Create(options.Docfile)
+			if err != nil {
+				return fmt.Errorf("write file: %w", err)
+			}
+			defer f.Close()
+			w = f
+		}
+		if err := bc.EmitDoc(ctx, w); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	h, err := bc.BuildHandler(ctx)
@@ -127,9 +153,9 @@ func run(config Config) error {
 		return fmt.Errorf("build handler: %w", err)
 	}
 
-	u, err := url.Parse(config.RedirectURL)
+	u, err := url.Parse(options.RedirectURL)
 	if err != nil {
-		return fmt.Errorf("invalid url: %q -- %w", config.RedirectURL, err)
+		return fmt.Errorf("invalid url: %q -- %w", options.RedirectURL, err)
 	}
 	srv := quickapi.NewServer(fmt.Sprintf(":%s", u.Port()), h, 5*time.Second)
 	return srv.ListenAndServe(ctx)
@@ -164,7 +190,7 @@ type TaskAPI struct {
 }
 
 type TaskAPIListInput struct {
-	TaskListID string `openapi:"path" path:"tasklistId"`
+	TaskListID string `in:"path" path:"tasklistId"`
 }
 
 func (api *TaskAPI) List(ctx context.Context, input TaskAPIListInput) ([]*tasks.Task, error) {
@@ -241,7 +267,7 @@ func (api *MarkdownAPI) ListTaskList(ctx context.Context, input quickapi.Empty) 
 }
 
 type MarkdownAPIDetailTaskListInput struct {
-	TaskListID string `openapi:"path" path:"tasklistId"`
+	TaskListID string `in:"path" path:"tasklistId"`
 }
 
 func (api *MarkdownAPI) DetailTaskList(ctx context.Context, input MarkdownAPIDetailTaskListInput) (string, error) {
