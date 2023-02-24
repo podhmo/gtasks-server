@@ -1,15 +1,13 @@
-//go:generate go run ./ --gendoc --docfile openapi.json
+//go:generate go run ./ --gendoc --docfile openapi.json --mdfile README.md
 package main
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -21,7 +19,6 @@ import (
 	"github.com/podhmo/gtasks-server/auth"
 	"github.com/podhmo/quickapi"
 	"github.com/podhmo/quickapi/qopenapi/define"
-	"github.com/podhmo/reflect-openapi/dochandler"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/tasks/v1"
@@ -30,6 +27,9 @@ import (
 //go:embed openapi.json
 var openapiDocData []byte
 
+//go:embed README.md
+var mdDocData []byte
+
 type Options struct {
 	ClientID     string `flag:"client-id" required:"true"`
 	ClientSecret string `flag:"client-secret" required:"true"`
@@ -37,6 +37,7 @@ type Options struct {
 
 	GenDoc  bool   `flag:"gendoc" help:"generate openapi.json to stdout"`
 	Docfile string `flag:"docfile" help:"write name of openapi.json"`
+	Mdfile  string `flag:"mdfile" help:"write name of apidoc.md"`
 }
 
 func main() {
@@ -99,21 +100,22 @@ func run(options Options) error {
 		mount(bc, authAPI)
 
 		// mount optional handler (not included in openapi.json)
-		bc.Router().Mount("/openapi", dochandler.New(bc.Doc(), "/openapi"))
+		dochandler, err := bc.BuildDocHandler(ctx, "/_doc", mdDocData)
+		if err != nil {
+			return err
+		}
+		bc.Router().Mount("/_doc", dochandler)
 	}
 
 	if options.GenDoc {
-		var w io.Writer = os.Stdout
-		if options.Docfile != "" {
-			f, err := os.Create(options.Docfile)
-			if err != nil {
-				return fmt.Errorf("write file: %w", err)
-			}
-			defer f.Close()
-			w = f
-		}
-		if err := bc.EmitDoc(ctx, w); err != nil {
+		if err := bc.EmitDoc(ctx, options.Docfile); err != nil {
 			return err
+		}
+
+		if options.Mdfile != "" {
+			if err := bc.EmitMDDoc(ctx, options.Mdfile); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

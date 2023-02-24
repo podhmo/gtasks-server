@@ -28,11 +28,25 @@
       "Task": {
         "additionalProperties": false,
         "properties": {
+          "HTTPStatusCode": {
+            "description": "HTTPStatusCode is the server's response status code. When using a\nresource method's Do call, this will always be in the 2xx range.",
+            "type": "integer"
+          },
+          "Header": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": "Header contains the response header fields from the server."
+          },
           "completed": {
             "description": "Completed: Completion date of the task (as a RFC 3339 timestamp).\nThis field is omitted if the task has not been completed.",
             "type": "string"
           },
           "deleted": {
+            "default": false,
             "description": "Deleted: Flag indicating whether the task has been deleted. The\ndefault is False.",
             "type": "boolean"
           },
@@ -45,6 +59,7 @@
             "type": "string"
           },
           "hidden": {
+            "default": false,
             "description": "Hidden: Flag indicating whether the task is hidden. This is the case\nif the task had been marked completed when the task list was last\ncleared. The default is False. This field is read-only.",
             "type": "boolean"
           },
@@ -92,6 +107,11 @@
             "type": "string"
           }
         },
+        "required": [
+          "HTTPStatusCode",
+          "Header"
+        ],
+        "title": "Task",
         "type": "object"
       },
       "TaskLinks": {
@@ -110,11 +130,25 @@
             "type": "string"
           }
         },
+        "title": "TaskLinks",
         "type": "object"
       },
       "TaskList": {
         "additionalProperties": false,
         "properties": {
+          "HTTPStatusCode": {
+            "description": "HTTPStatusCode is the server's response status code. When using a\nresource method's Do call, this will always be in the 2xx range.",
+            "type": "integer"
+          },
+          "Header": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": "Header contains the response header fields from the server."
+          },
           "etag": {
             "description": "Etag: ETag of the resource.",
             "type": "string"
@@ -140,12 +174,17 @@
             "type": "string"
           }
         },
+        "required": [
+          "HTTPStatusCode",
+          "Header"
+        ],
+        "title": "TaskList",
         "type": "object"
       }
     }
   },
   "info": {
-    "description": "-",
+    "description": "gtask-server",
     "title": "gtask-server",
     "version": "0.0.0"
   },
@@ -175,7 +214,10 @@
             },
             "description": "default error"
           }
-        }
+        },
+        "tags": [
+          "main"
+        ]
       }
     },
     "/api/tasklist": {
@@ -205,7 +247,10 @@
             },
             "description": "default error"
           }
-        }
+        },
+        "tags": [
+          "main"
+        ]
       }
     },
     "/api/tasklist/{tasklistId}": {
@@ -245,7 +290,10 @@
             },
             "description": "default error"
           }
-        }
+        },
+        "tags": [
+          "main"
+        ]
       }
     },
     "/{tasklistId}": {
@@ -282,7 +330,10 @@
             },
             "description": "default error"
           }
-        }
+        },
+        "tags": [
+          "main"
+        ]
       }
     }
   },
