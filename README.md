@@ -14,39 +14,12 @@ gtask-server
 
 | endpoint | operationId | tags | summary |
 | --- | --- | --- | --- |
-| `GET /` | [main.MarkdownAPI.ListTaskList](#mainmarkdownapilisttasklist-get-)  | `main` |  |
 | `GET /api/tasklist` | [main.TaskListAPI.List](#maintasklistapilist-get-apitasklist)  | `main` |  |
 | `GET /api/tasklist/{tasklistId}` | [main.TaskAPI.List](#maintaskapilist-get-apitasklisttasklistid)  | `main` |  |
-| `GET /{tasklistId}` | [main.MarkdownAPI.DetailTaskList](#mainmarkdownapidetailtasklist-get-tasklistid)  | `main` |  |
+| `GET /` | [main.MarkdownAPI.ListTaskList](#mainmarkdownapilisttasklist-get-)  | `main text/html` |  |
+| `GET /{tasklistId}` | [main.MarkdownAPI.DetailTaskList](#mainmarkdownapidetailtasklist-get-tasklistid)  | `main text/html` |  |
 
 
-### main.MarkdownAPI.ListTaskList `GET /`
-
-
-
-| name | value | 
-| --- | --- |
-| operationId | main.MarkdownAPI.ListTaskList |
-| endpoint | `GET /` |
-| tags | `main` |
-
-
-
-#### output (application/json)
-
-```go
-
-
-// GET / (default)
-// default error
-type OutputDefault struct {	// ErrorResponse
-	code integer
-
-	error string
-
-	detail? []string
-}
-```
 ### main.TaskListAPI.List `GET /api/tasklist`
 
 
@@ -62,7 +35,6 @@ type OutputDefault struct {	// ErrorResponse
 #### output (application/json)
 
 ```go
-
 // GET /api/tasklist (200)
 type Output200 []struct {	// TaskList
 	// Etag: ETag of the resource.
@@ -126,7 +98,6 @@ type Input struct {
 #### output (application/json)
 
 ```go
-
 // GET /api/tasklist/{tasklistId} (200)
 type Output200 []struct {	// Task
 	// Completed: Completion date of the task (as a RFC 3339 timestamp).
@@ -220,6 +191,23 @@ type OutputDefault struct {	// ErrorResponse
 	detail? []string
 }
 ```
+
+
+### main.MarkdownAPI.ListTaskList `GET /`
+
+
+
+| name | value | 
+| --- | --- |
+| operationId | main.MarkdownAPI.ListTaskList |
+| endpoint | `GET /` |
+| tags | `main` |
+
+
+
+#### output (text/html)
+
+
 ### main.MarkdownAPI.DetailTaskList `GET /{tasklistId}`
 
 
@@ -231,7 +219,7 @@ type OutputDefault struct {	// ErrorResponse
 | tags | `main` |
 
 
-#### input (application/json)
+#### input
 
 ```go
 // GET /{tasklistId}
@@ -240,21 +228,9 @@ type Input struct {
 }
 ```
 
-#### output (application/json)
-
-```go
+#### output (text/html)
 
 
-// GET /{tasklistId} (default)
-// default error
-type OutputDefault struct {	// ErrorResponse
-	code integer
-
-	error string
-
-	detail? []string
-}
-```
 
 
 
@@ -284,10 +260,10 @@ type ErrorResponse struct {
 }
 ```
 
-- [output of main.MarkdownAPI.ListTaskList (default)](#mainmarkdownapilisttasklist-get-)
-- [output of main.TaskListAPI.List (default)](#maintasklistapilist-get-apitasklist)
-- [output of main.TaskAPI.List (default)](#maintaskapilist-get-apitasklisttasklistid)
-- [output of main.MarkdownAPI.DetailTaskList (default)](#mainmarkdownapidetailtasklist-get-tasklistid)
+- [output of main.MarkdownAPI.ListTaskList (default) as `ErrorResponse`](#mainmarkdownapilisttasklist-get-)
+- [output of main.TaskListAPI.List (default) as `ErrorResponse`](#maintasklistapilist-get-apitasklist)
+- [output of main.TaskAPI.List (default) as `ErrorResponse`](#maintaskapilist-get-apitasklisttasklistid)
+- [output of main.MarkdownAPI.DetailTaskList (default) as `ErrorResponse`](#mainmarkdownapidetailtasklist-get-tasklistid)
 
 ### Task
 
@@ -375,6 +351,7 @@ type Task struct {
 }
 ```
 
+- [output of main.TaskAPI.List (200) as `[]Task`](#maintaskapilist-get-apitasklisttasklistid)
 
 ### TaskLinks
 
@@ -425,3 +402,5 @@ type TaskList struct {
 	Header map[string][]string
 }
 ```
+
+- [output of main.TaskListAPI.List (200) as `[]TaskList`](#maintasklistapilist-get-apitasklist)
